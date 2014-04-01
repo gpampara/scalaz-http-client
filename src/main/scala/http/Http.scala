@@ -7,7 +7,7 @@ import request._
 import response._
 
 object Http {
-  import RequestHeader._
+/*  import RequestHeader._
 
   import scalaz.syntax.std.option._
   import scalaz.syntax.std.string._
@@ -17,14 +17,6 @@ object Http {
 
   import HttpResponseParser.ParserError
 
-  // http.post("loginGet", params).map(_ match {
-  //   case Http.SimpleHttpResult(code, content) if (code / 100 == 2) =>
-  //     $d("Logged in to remote server")
-  //     new Remote(http)
-  //   case Http.SimpleHttpResult(410, _) => throw new RemoteLoginException("INVALID USER")
-  //   case Http.SimpleHttpResult(401, _) => throw new RemoteLoginException("INVALID PASSWORD")
-  //   case Http.SimpleHttpResult(code, error) => throw new RemoteHttpFailure(code, error)
-  // })
   def login(username: String, password: String, f: HttpResponse[Stream] => Unit): Kleisli[Task, java.net.InetSocketAddress, Unit] =
     Kleisli.kleisli((addr: java.net.InetSocketAddress) =>
       (for {
@@ -81,12 +73,12 @@ object Transport {
         val s = scala.io.Source.fromInputStream(socket.getInputStream).mkString
         socket.close
 
-        Parser(s)
+        //Parser(s)
       }}))
 
   val secureSocketProvider = new SocketProvider {
     def apply(request: HttpRequest[Stream]) =
       ???
   }
-
+*/
 }

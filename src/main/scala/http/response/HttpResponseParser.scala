@@ -2,56 +2,76 @@ package http
 package response
 
 import scalaz._
+import atto._, Atto._
 
 object HttpResponseParser {
-  import Scalaz._
-  import scala.util.parsing.combinator._
 
-  final case class ParserError(msg: String, pos: String)
+  lazy val cr: Parser[Char] =
+    char(0x0D)
 
-  object Parser extends RegexParsers {
-    override val skipWhitespace = false
-    val eol = """\r\n""".r
-    val digit = """1|0""".r
-    val version = digit ~ "." ~ digit ^^ {
-      case maj ~ _ ~ min =>
-        (Digit.digitFromChar(maj.charAt(0)) |@| Digit.digitFromChar(min.charAt(0))) {
-          Version.version(_, _)
-        }
-    }
-    val code: Parser[Option[Status]] = repN(3, """\d""".r) ^^ { l => Status.fromInt(l.foldLeft("")(_ + _).toInt) }
-    val alphaSpace: Parser[String] = """[a-zA-Z0-9 -]+""".r
-    val statusLine: Parser[Option[StatusLine]] = "HTTP/" ~> version ~ " " ~ code ~ " " ~ alphaSpace ~ eol ^^ {
-      case v ~ _ ~ c ~ _ ~ a ~ _ =>
-        for {
-          vv <- v
-          cc <- c
-        } yield StatusLine.statusLine(vv, cc, a.toList)
+  lazy val lf: Parser[Char] =
+    char(0x0A)
+
+  lazy val eol: Parser[Unit] =
+    (cr ~ lf | cr | lf) map (_ => ())
+
+  lazy val dot =
+    char('.')
+
+  lazy val zeroD: Parser[Option[Digit]] =
+    char('0') map (Digit.digitFromChar(_))
+
+  lazy val oneD: Parser[Option[Digit]] =
+    char('1') map (Digit.digitFromChar(_))
+
+  import scalaz.syntax.apply._
+  import scalaz.syntax.std.list._
+  import scalaz.std.option._
+  import scalaz.std.list._
+  import scalaz.syntax.std.string._
+
+  lazy val version: Parser[Option[Version]] =
+    for {
+      _ <- string("HTTP/")
+      major <- oneD <~ dot
+      minor <- (oneD | zeroD)
+    } yield (major |@| minor)(Version.version(_, _))
+
+  lazy val httpCode =
+    int.map(Status.fromInt(_)) as "httpCode"
+
+  lazy val alphaText: Parser[List[Char]] =
+    many(letterOrDigit | spaceChar | char('-'))
+
+  lazy val statusLine =
+    for {
+      v <- version <~ spaceChar
+      c <- httpCode <~ spaceChar
+      t <- alphaText <~ eol
+    } yield (v |@| c)(StatusLine.statusLine(_, _, t))
+
+  lazy val printableChar: Parser[Char] =
+    elem(c => c >= 32 && c < 127)
+
+  lazy val header: Parser[Option[(ResponseHeader, NonEmptyList[Char])]] =
+    for {
+      key <- alphaText <~ string(": ")
+      value <- many1(printableChar) <~ eol
+    } yield (ResponseHeader.fromString(key.mkString) |@| value.mkString.charsNel)((_, _))
+
+  lazy val httpHeader =
+    for {
+      line <- statusLine
+      headers <- many1(header)
+      _ <- eol
+    } yield {
+      import Scalaz._
+      (line |@| headers.sequence)(HttpResponse.response[Stream](_, _, Stream.empty))
     }
 
-    val header: Parser[Option[(ResponseHeader, NonEmptyList[Char])]] = alphaSpace ~ ": " ~ """.+""".r <~ eol ^^ {
-      case a ~ _ ~ b => for {
-        header <- ResponseHeader.fromString(a)
-        message <- b.charsNel
-      } yield { println("header => " + header + ": " + message); (header, message) }
-    }
-
-    val httpHeader: Parser[Option[HttpResponse[Stream]]] = statusLine ~ rep(header) ~ eol ^^ {
-      case status ~ headers ~ _ =>
-        val hdrs: List[(ResponseHeader, NonEmptyList[Char])] = headers.flatMap(_.toList)
-        status map { x => HttpResponse.response[Stream](x, hdrs, Stream.empty) }
-    }
-
-    def apply(in: String): ParserError \/ HttpResponse[Stream] = parse(httpHeader, in) match {
-      case Success(result, next) => {
-        val rest = next.source.toString.drop(next.offset)
-        val r: Option[HttpResponse[Stream]] = result
-        r.map(x => {
-          val length = x.headers find { case (k, v) => k.asString == ContentLength.asString } map (_._2) flatMap (_.list.mkString.parseInt.toOption) getOrElse 0
-          x >> rest.toStream.map(_.toByte).take(length)
-        }).toRightDisjunction(ParserError("Error in parsing HTTP response", ""))
-      }
-      case NoSuccess(msg, next) => \/.left(ParserError(msg, next.pos.longString))
-    }
-  }
+  lazy val response =
+    for {
+      h <- httpHeader
+      body <- many(printableChar) <~ eol <~ eol
+    } yield h.map(_ >> body.map(_.toByte).toStream)
 }
