@@ -7,58 +7,27 @@ import request._
 import response._
 
 object Http {
-/*  import RequestHeader._
-
-  import scalaz.syntax.std.option._
-  import scalaz.syntax.std.string._
+  import scalaz._, Scalaz._
 
   private def host(addr: java.net.InetSocketAddress) =
     Option(addr.getHostName + (if (addr.getPort != 80) ":" + addr.getPort else "")).flatMap(_.charsNel).cata(identity, "Unknown".unsafeCharsNel)
 
-  import HttpResponseParser.ParserError
-
-  def login(username: String, password: String, f: HttpResponse[Stream] => Unit): Kleisli[Task, java.net.InetSocketAddress, Unit] =
-    Kleisli.kleisli((addr: java.net.InetSocketAddress) =>
-      (for {
-        a <- HttpRequest.request(
-          Line.line(GET, Uri.uri("/loginGet".unsafeCharsNel, Map("email" -> username, "pass" -> password, "noRedirect" -> "1").map(x => x._1 + "=" + x._2).mkString("&").charsNel), Version.version11),
-          List((Host, host(addr)), (Connection, "close".unsafeCharsNel)),
-          Stream.empty)
-        b <- Transport.socket
-      } yield b(a).foreach(f)).run(addr)) // save the cookie from the server in the sharedpreferences
-
-  def withAuth(f: HttpResponse[Stream] => Unit, x: Kleisli[Task, java.net.InetSocketAddress, ParserError \/ HttpResponse[Stream]]) =//: Kleisli[Task, java.net.InetSocketAddress, ParserError \/ HttpResponse[Stream]] =
-    kleisli((addr: java.net.InetSocketAddress) => {
-      import scalaz.syntax.bind._
-      x.run(addr).flatMap(_ match {
-        case left @ -\/(e) =>
-          Task.now(left)
-        case right @ \/-(h) =>
-          if (h.status == Found || h.status == Unauthorized) {
-            (login("admin", "pass", f) >> x).run(addr) // do login (ignoring the output, because it's a really a side-effect) and then do x
-          } else Task.now(right)
-      })
-    })
-
-  def get(f: HttpResponse[Stream] => Unit)(addr: java.net.InetSocketAddress, path: String, queryParams: Option[String]) =
-    withAuth(f, for {
-      a <- Transport.socket
-      b <- HttpRequest.request(
-        Line.line(GET, Uri.uri(path.unsafeCharsNel, queryParams.flatMap(_.charsNel)), Version.version11),
+  def get(addr: java.net.InetSocketAddress, path: String, queryParams: Option[String]) =
+    (for {
+      conn <- Transport.socket
+      req <- HttpRequest.request(
+        Line.line(GET, Uri.uri(path.unsafeCharsNel, queryParams.flatMap(_.charsNel)), Version.version10),
         List((Host, host(addr)), (Connection, "close".unsafeCharsNel)),
         Stream.empty)
-    } yield a(b)).run(addr)
-
-  def post(params: Map[String, String]) =
-    ???
+    } yield conn(req)).run(addr)
 }
 
 object Transport {
+  import atto._, Atto._
   import scalaz.syntax.show._
-  import HttpResponseParser._
 
   trait SocketProvider { // This is basically a Reader with params fixed
-    def apply(request: HttpRequest[Stream]): ParserError \/ HttpResponse[Stream]
+    def apply(request: HttpRequest[Stream]): String \/ Option[http.response.HttpResponse[Stream]]
   }
 
   val socket: Kleisli[Task, java.net.InetSocketAddress, SocketProvider] =
@@ -70,15 +39,14 @@ object Transport {
         writer.write(request.shows)
         writer.flush()
 
-        val s = scala.io.Source.fromInputStream(socket.getInputStream).mkString
+        val s = scala.io.Source.fromInputStream(socket.getInputStream).takeWhile(_ != -1).mkString
         socket.close
 
-        //Parser(s)
+        HttpResponseParser.response.parse(s).either
       }}))
 
   val secureSocketProvider = new SocketProvider {
     def apply(request: HttpRequest[Stream]) =
       ???
   }
-*/
 }

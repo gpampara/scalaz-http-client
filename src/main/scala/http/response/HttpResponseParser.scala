@@ -72,6 +72,6 @@ object HttpResponseParser {
   lazy val response =
     for {
       h <- httpHeader
-      body <- many(printableChar) <~ eol <~ eol
+      body <- many(printableChar)// <~ eol <~ eol
     } yield h.map(_ >> body.map(_.toByte).toStream)
 }
