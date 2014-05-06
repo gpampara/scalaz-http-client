@@ -63,7 +63,6 @@ object HttpResponseParser {
     for {
       line <- statusLine
       headers <- many1(header)
-      _ <- eol
     } yield {
       import Scalaz._
       (line |@| headers.sequence)(HttpResponse.response[Stream](_, _, Stream.empty))
@@ -72,6 +71,6 @@ object HttpResponseParser {
   lazy val response =
     for {
       h <- httpHeader
-      body <- many(printableChar)// <~ eol <~ eol
-    } yield h.map(_ >> body.map(_.toByte).toStream)
+      body <- opt(many(printableChar) <~ eol)
+    } yield h.map(_ >> body.map(l => l.map(_.toByte).toStream).getOrElse(Stream.empty))
 }

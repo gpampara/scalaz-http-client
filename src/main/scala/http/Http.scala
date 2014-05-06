@@ -12,14 +12,21 @@ object Http {
   private def host(addr: java.net.InetSocketAddress) =
     Option(addr.getHostName + (if (addr.getPort != 80) ":" + addr.getPort else "")).flatMap(_.charsNel).cata(identity, "Unknown".unsafeCharsNel)
 
-  def get(addr: java.net.InetSocketAddress, path: String, queryParams: Option[String]) =
+  private def getOrHead(addr: java.net.InetSocketAddress, path: String, queryParams: Option[String], method: Method) =
     (for {
       conn <- Transport.socket
       req <- HttpRequest.request(
-        Line.line(GET, Uri.uri(path.unsafeCharsNel, queryParams.flatMap(_.charsNel)), Version.version10),
+        Line.line(method, Uri.uri(path.unsafeCharsNel, queryParams.flatMap(_.charsNel)), Version.version10),
         List((Host, host(addr)), (Connection, "close".unsafeCharsNel)),
         Stream.empty)
     } yield conn(req)).run(addr)
+
+  def head(addr: java.net.InetSocketAddress, path: String, queryParams: Option[String]) =
+    getOrHead(addr, path, queryParams, HEAD)
+
+  def get(addr: java.net.InetSocketAddress, path: String, queryParams: Option[String]) =
+    getOrHead(addr, path, queryParams, GET)
+
 }
 
 object Transport {
