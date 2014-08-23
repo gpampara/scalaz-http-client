@@ -24,6 +24,9 @@ object HttpResponseParser {
   lazy val oneD: Parser[Option[Digit]] =
     char('1') map (Digit.digitFromChar(_))
 
+  lazy val httpCode: Parser[Option[Status]] =
+    int.map(Status.fromInt(_)) named "httpCode"
+
   import scalaz.syntax.apply._
   import scalaz.syntax.std.list._
   import scalaz.std.option._
@@ -36,9 +39,6 @@ object HttpResponseParser {
       major <- oneD <~ dot
       minor <- (oneD | zeroD)
     } yield (major |@| minor)(Version.version(_, _))
-
-  lazy val httpCode =
-    int.map(Status.fromInt(_)) as "httpCode"
 
   lazy val alphaText: Parser[List[Char]] =
     many(letterOrDigit | spaceChar | char('-'))
@@ -65,7 +65,7 @@ object HttpResponseParser {
       headers <- many1(header)
     } yield {
       import Scalaz._
-      (line |@| headers.sequence)(HttpResponse.response[Stream](_, _, Stream.empty))
+      (line |@| headers.sequenceU)(HttpResponse.response[Stream](_, _, Stream.empty))
     }
 
   lazy val response =

@@ -16,15 +16,15 @@ sealed trait HttpResponse[F[_]] {
 
   def versionMajor = line.version.major
 
-  def verionMino = line.version.minor
+  def versionMinor = line.version.minor
 
   def status = line.status
 
-  // This function could benefit from caching of the headers in a mp perhaps?
+  // This function could benefit from caching of the headers in a map perhaps?
   def contentType(f : NonEmptyList[Char] => Boolean) =
     headers find { case (k, v) => k == ContentType } map (x => f(x._2)) getOrElse false
 
-  def cotentTypeEquals(s: String) =
+  def contentTypeEquals(s: String) =
     contentType(_.list.mkString == s)
 
   def bodyLength(implicit f: Foldable[F]) =
