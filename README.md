@@ -1,3 +1,9 @@
+DEPRECATED
+==========
+
+Please have a look at, and use, [httpz](https://github.com/xuwei-k/httpz) which does
+exactly what this project was going to do.
+
 scalaz-http-client
 ==================
 
